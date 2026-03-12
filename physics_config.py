@@ -4,7 +4,7 @@ import numpy as np
 
 
 DEFAULT_T_SHIFT_K = 293.15
-DEFAULT_MIN_SAMPLING_SPACING_M = 50e-6
+DEFAULT_MIN_SAMPLING_SPACING_M = 5e-6
 
 
 @dataclass
@@ -83,8 +83,12 @@ class ChipletStack:
     layers: List[LayerProperty]
     boundary: BoundaryProperty
     q_ref: float
+    x_size_m: float
+    y_size_m: float
     T_shift_k: float = DEFAULT_T_SHIFT_K
     min_sampling_spacing_m: float = DEFAULT_MIN_SAMPLING_SPACING_M
+    power_sample_min: float = 0.1
+    power_sample_max: float = 2.0
     scales: NormalizationScales = field(init=False)
 
     def __post_init__(self):
@@ -94,10 +98,16 @@ class ChipletStack:
         total_thickness = sum(layer.thickness for layer in self.layers)
         if total_thickness <= 0:
             raise ValueError("总厚度必须大于 0")
+        if self.x_size_m <= 0:
+            raise ValueError("x_size_m 必须大于 0")
+        if self.y_size_m <= 0:
+            raise ValueError("y_size_m 必须大于 0")
         if self.min_sampling_spacing_m <= 0:
             raise ValueError("min_sampling_spacing_m 必须大于 0")
         if self.min_sampling_spacing_m > total_thickness:
             raise ValueError("min_sampling_spacing_m 不能大于总厚度")
+        if self.power_sample_min >= self.power_sample_max:
+            raise ValueError("power_sample_min 必须小于 power_sample_max")
 
         for i, layer in enumerate(self.layers):
             if layer.k <= 0:
@@ -118,6 +128,18 @@ class ChipletStack:
     @property
     def total_thickness(self) -> float:
         return sum(layer.thickness for layer in self.layers)
+
+    @property
+    def x_size_norm(self) -> float:
+        return self.x_size_m / self.scales.L_ref
+
+    @property
+    def y_size_norm(self) -> float:
+        return self.y_size_m / self.scales.L_ref
+
+    @property
+    def nz(self) -> int:
+        return max(2, int(round(self.total_thickness / self.min_sampling_spacing_m)) + 1)
 
     @property
     def z_interfaces(self) -> np.ndarray:
